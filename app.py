@@ -78,78 +78,78 @@ st.markdown("""
             animation: glow 2s ease-in-out infinite;
             transition: width 0.5s ease-in-out;
         }
-        
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 15px #00E5FF, 0 0 25px #00FF9C; }
-            50% { box-shadow: 0 0 20px #00E5FF, 0 0 35px #00FF9C; }
-        }
-        
-        /* Section headers */
-        .section-header {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #00E5FF;
-            text-shadow: 0 0 10px #00E5FF;
-            margin-top: 25px;
-            margin-bottom: 15px;
-            letter-spacing: 1px;
-        }
-        
-        /* Confidence Score */
-        .confidence-score {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #00FF9C;
-            text-shadow: 0 0 10px #00FF9C;
-            letter-spacing: 1px;
-        }
-        
-        /* Expandable sections */
-        .streamlit-expanderHeader {
-            background-color: #1a1a1a;
-            border: 1px solid #00E5FF;
-            border-radius: 6px;
-            color: #00E5FF;
-            box-shadow: 0 0 10px #00E5FF;
-        }
-        
-        /* Banner image */
-        .banner-image {
-            width: 100%;
-            object-fit: cover;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 0 20px #00E5FF;
-        }
-        
-        /* Footer */
-        footer {
-            text-align: center;
-            padding: 10px;
-            font-size: 0.85rem;
-            color: #00A8A8;
-            text-shadow: 0 0 5px #00E5FF;
-        }
-        
-        /* Responsive text */
-        p, span {
-            color: #E0E0E0;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+                # Try to parse a JSON object from the model response first (preferred)
+                confidence = None
+                prediction = "Unknown"
+                positive_indicators = []
+                negative_indicators = []
+                explanation = response_text
+                human_summary = None
 
-# Main functionality
-def main(): 
-    # Neon Title Banner
-    st.markdown('<div class="neon-title">JOB FRAUD ANALYZER </div>', unsafe_allow_html=True)
-    st.write("Analyze job postings for legitimacy using AI and data-driven techniques.")
-    st.image(r"762887_Job1-01.jpg", caption="Ensure safe job applications!", use_column_width=True)
+                # Look for the first JSON object in the response
+                json_obj = None
+                m = re.search(r"(\{[\s\S]*?\})", response_text)
+                if m:
+                    json_text = m.group(1)
+                    try:
+                        json_obj = json.loads(json_text)
+                    except Exception:
+                        json_obj = None
 
-    with st.sidebar:
-        st.header("Input Job Details")
-        company_name = st.text_input("Company Name", placeholder="e.g., Acme Corporation")
-        job_title = st.text_input("Job Title", placeholder="e.g., Software Engineer")
-        job_description = st.text_area("Job Description", placeholder="Paste the job description here...")
+                if json_obj:
+                    # Safely extract fields
+                    prediction = str(json_obj.get("prediction", "Unknown")).capitalize()
+                    try:
+                        confidence = int(json_obj.get("confidence", 0))
+                    except Exception:
+                        confidence = 0
+                    positive_indicators = json_obj.get("positive_indicators", []) or []
+                    negative_indicators = json_obj.get("negative_indicators", []) or []
+                    explanation = json_obj.get("explanation", explanation)
+                    # capture any trailing human-readable summary after the JSON block
+                    trailing = response_text[m.end():].strip()
+                    if trailing:
+                        human_summary = trailing
+                    # Enforce confidence bounds
+                    confidence = max(0, min(100, confidence))
+                    # Enforce critical rule: if Calculated Risk Score >=50 or obvious negatives present, force 0
+                    obvious_negative_terms = ["pay_upfront","wire_transfer","western_union","money_gram","no_interview","no_experience","guaranteed_income","bank_details","upfront_fee","bitcoin","crypto","send_money"]
+                    if desc_analysis.get('risk_score', 0) >= 50 or any(term in ",".join(negative_indicators).lower() for term in obvious_negative_terms):
+                        confidence = 0
+                        prediction = "Suspicious"
+                else:
+                    # Fallback to regex extraction if JSON not provided (original text pattern allowed)
+                    prediction_match = re.search(r'Prediction:\s*(Legitimate|Suspicious)', response_text, re.IGNORECASE)
+                    confidence_match = re.search(r'Confidence:\s*(\d+)\s*%', response_text, re.IGNORECASE)
+                    explanation_match = re.search(r'Explanation:\s*(.*)', response_text, re.IGNORECASE | re.DOTALL)
+                    prediction = prediction_match.group(1).capitalize() if prediction_match else "Unknown"
+                    if confidence_match:
+                        confidence = int(confidence_match.group(1))
+                        confidence = max(0, min(100, confidence))
+                    else:
+                        # Fallback heuristic: derive confidence from risk_score
+                        risk_score = desc_analysis.get('risk_score', 0)
+                        if prediction.lower() == "suspicious":
+                            confidence = 0 if risk_score >= 50 else max(10, 50 - (risk_score // 2))
+                        elif prediction.lower() == "legitimate":
+                            # Only increase confidence when there are positive indicators
+                            pos = []
+                            if in_verified_job_board:
+                                pos.append('verified_job_board')
+                            if desc_analysis.get('red_flag_count', 0) == 0 and desc_analysis.get('suspicious_pattern_severity', 0) == 0:
+                                pos.append('no_flags')
+                            confidence = 60 + min(40, len(pos) * 20)
+                        else:
+                            confidence = 50
+                    # Pull explanation from text if present
+                    if explanation_match:
+                        explanation = explanation_match.group(1).strip()
+                    human_summary = response_text.strip()
+
+                # Ensure final safety bounds
+                if confidence is None:
+                    confidence = 0
+                confidence = int(max(0, min(100, confidence)))
         job_url = st.text_input("Job URL", placeholder="e.g., https://example.com/job123")
         company_profile = st.text_input("Company Profile", placeholder="Leading tech company")
         requirements = st.text_area("Job Requirements", placeholder="Enter the job requirements")
@@ -221,18 +221,28 @@ def main():
                                 4. Highlight specific red flags or positive indicators found.
                                 5. Recommend actions for the job seeker.
 
-                                IMPORTANT: Return a single JSON object only (no extra commentary). The JSON must include these keys:
+                                PREFERRED OUTPUT: First return a single JSON object (so it can be parsed automatically). After the JSON object, you may optionally include a short human-readable summary (2-4 sentences) that follows the earlier plain-text pattern. If you cannot produce JSON, return the plain-text pattern described below.
+
+                                JSON OBJECT (preferred) - must include these keys:
                                     - "prediction": "Legitimate" or "Suspicious"
                                     - "confidence": integer 0-100 (if obvious scam indicators present or Calculated Risk Score >=50, set to 0)
                                     - "positive_indicators": list of short strings (or empty list)
                                     - "negative_indicators": list of short strings (or empty list)
                                     - "explanation": concise 1-3 sentence explanation
 
-                                Example JSON:
-                                {{"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":["pay_upfront","western_union"],"explanation":"Upfront payment requested and Western Union mentioned."}}
+                                After the JSON you may include a brief human-readable summary in plain text (optional). Example combined output:
+                                {{"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":["pay_upfront"],"explanation":"Upfront payment requested."}}
+                                Prediction: Suspicious
+                                Confidence: 0%
+                                Explanation: Upfront payment requested and Western Union mentioned. This is a high-risk posting.
 
-                                If you cannot follow these rules exactly, return {{"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":[],"explanation":"Unable to produce structured output."}}
-                                Your tone should be professional and concise. Provide only the JSON object as the response."""
+                                FALLBACK (if JSON is not possible): produce the plain-text pattern exactly as before (three lines):
+                                Prediction: [Legitimate/Suspicious]
+                                Confidence: [XX%]
+                                Explanation: [Your detailed reasoning here]
+
+                                Tone: professional and concise. Prefer JSON first, but allow the human-friendly plain-text summary after it so the UI shows both.
+"""
 
             # Generate analysis
             response = gemini_model.generate_content(prompt)
