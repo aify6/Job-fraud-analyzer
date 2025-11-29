@@ -194,54 +194,41 @@ def main():
             # Format red flags for prompt
             red_flags_display = ", ".join(desc_analysis["red_flag_matches"]) if desc_analysis["red_flag_matches"] else "None detected"
 
-            # Comprehensive analysis prompt - enhanced with severity data
+            # Comprehensive analysis prompt (original plain-text)
             prompt = f"""Carefully analyze this job posting for legitimacy:
 
-                Job Details:
-                - Job Title: {job_title}
-                - Company: {company_name}
-                - Job URL: {job_url}
+Job Details:
+- Job Title: {job_title}
+- Company: {company_name}
+- Job URL: {job_url}
 
-                Technical Verification:
-                - URL Validation: {validate_url}
-                - Verified Job Board: {in_verified_job_board}
+Technical Verification:
+- URL Validation: {validate_url}
+- Verified Job Board: {in_verified_job_board}
 
-                Risk Indicators:
-                - Red Flags Detected: {desc_analysis['red_flag_count']} ({red_flags_display})
-                - Suspicious Patterns: {desc_analysis['suspicious_pattern_count']} (severity score: {desc_analysis['suspicious_pattern_severity']})
-                - Calculated Risk Score: {desc_analysis['risk_score']}/90
-                - Machine Learning Prediction: {'Legitimate' if ml_prediction == 1 else 'Suspicious'}
+Risk Indicators:
+- Red Flags Detected: {desc_analysis.get('red_flag_count', 0)}
+- Suspicious Patterns: {desc_analysis.get('suspicious_pattern_count', 0)}
+- Calculated Risk Score: {desc_analysis.get('risk_score', 0)}
 
-                Comprehensive Analysis Request:
-                1. Provide a detailed assessment of the job posting's legitimacy.
-                2. Explain the reasoning behind your assessment, citing specific evidence.
-                3. Generate a confidence percentage (0-100%) based on the strength of evidence.
-                    - If the prediction is LEGITIMATE, the confidence should naturally tend towards a higher percentage (reflecting higher certainty)
-                    - If the prediction is SUSPICIOUS, the confidence should naturally tend towards a lower percentage (reflecting lower certainty)
-                                4. Highlight specific red flags or positive indicators found.
-                                5. Recommend actions for the job seeker.
+Machine Learning Prediction: {'Legitimate' if ml_prediction == 1 else 'Suspicious'}
 
-                                PREFERRED OUTPUT: First return a single JSON object (so it can be parsed automatically). After the JSON object, you may optionally include a short human-readable summary (2-4 sentences) that follows the earlier plain-text pattern. If you cannot produce JSON, return the plain-text pattern described below.
+Comprehensive Analysis Request:
+1. Provide a detailed assessment of the job posting's legitimacy.
+2. Explain the reasoning behind your assessment.
+3. Generate a confidence percentage (0-100%) based on the strength of evidence.
+    - If the prediction is LEGITIMATE, the confidence should naturally tend towards a higher percentage (reflecting higher certainty)
+    - If the prediction is SUSPICIOUS, the confidence should naturally tend towards a lower percentage (reflecting lower certainty)
+4. Highlight specific red flags or positive indicators.
+5. Recommend actions for the job seeker.
 
-                                JSON OBJECT (preferred) - must include these keys:
-                                    - "prediction": "Legitimate" or "Suspicious"
-                                    - "confidence": integer 0-100 (if obvious scam indicators present or Calculated Risk Score >=50, set to 0)
-                                    - "positive_indicators": list of short strings (or empty list)
-                                    - "negative_indicators": list of short strings (or empty list)
-                                    - "explanation": concise 1-3 sentence explanation
+Output Format:
+Prediction: [Legitimate/Suspicious]
+Confidence: [XX%]
+Explanation: [Your detailed reasoning here]
 
-                                After the JSON you may include a brief human-readable summary in plain text (optional). Example combined output:
-                                {{"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":["pay_upfront"],"explanation":"Upfront payment requested."}}
-                                Prediction: Suspicious
-                                Confidence: 0%
-                                Explanation: Upfront payment requested and Western Union mentioned. This is a high-risk posting.
-
-                                FALLBACK (if JSON is not possible): produce the plain-text pattern exactly as before (three lines):
-                                Prediction: [Legitimate/Suspicious]
-                                Confidence: [XX%]
-                                Explanation: [Your detailed reasoning here]
-
-                                Tone: professional and concise. Prefer JSON first, but allow the human-friendly plain-text summary after it so the UI shows both.
+Your response should be Accurate, Clear, Concise and straight to the point. 
+Your tone should be friendly but professional.
 """
 
             # Generate analysis
