@@ -217,18 +217,21 @@ Comprehensive Analysis Request:
 1. Provide a detailed assessment of the job posting's legitimacy.
 2. Explain the reasoning behind your assessment.
 3. Generate a confidence percentage (0-100%) based on the strength of evidence.
+    - If there is a strong undeniable negative indicator  (e.g., Gibberish), the confidence should be 0%. DO NOT increase confidence if there are no strong positive indicators.
     - If the prediction is LEGITIMATE, the confidence should naturally tend towards a higher percentage (reflecting higher certainty)
     - If the prediction is SUSPICIOUS, the confidence should naturally tend towards a lower percentage (reflecting lower certainty)
 4. Highlight specific red flags or positive indicators.
 5. Recommend actions for the job seeker.
 
 Output Format:
-Prediction: [Legitimate/Suspicious]
-Confidence: [XX%]
-Explanation: [Your detailed reasoning here]
+    Prediction: [Legitimate/Suspicious]
 
-Your response should be Accurate, Clear, Concise and straight to the point. 
-Your tone should be friendly but professional.
+    Confidence: [XX%]
+
+    Explanation: [Your detailed reasoning here]
+
+    Your response should be Accurate, Clear, Concise and straight to the point. 
+    Your tone should be friendly but professional.
 """
 
             # Generate analysis
