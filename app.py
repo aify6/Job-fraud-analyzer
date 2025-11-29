@@ -229,9 +229,9 @@ def main():
                                     - "explanation": concise 1-3 sentence explanation
 
                                 Example JSON:
-                                {"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":["pay_upfront","western_union"],"explanation":"Upfront payment requested and Western Union mentioned."}
+                                {{"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":["pay_upfront","western_union"],"explanation":"Upfront payment requested and Western Union mentioned."}}
 
-                                If you cannot follow these rules exactly, return {"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":[],"explanation":"Unable to produce structured output."}
+                                If you cannot follow these rules exactly, return {{"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":[],"explanation":"Unable to produce structured output."}}
                                 Your tone should be professional and concise. Provide only the JSON object as the response."""
 
             # Generate analysis
