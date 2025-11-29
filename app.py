@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import re
+import json
 from joblegitchecker2 import JobLegitimacyChecker
 import os
 
@@ -196,57 +197,108 @@ def main():
             # Comprehensive analysis prompt - enhanced with severity data
             prompt = f"""Carefully analyze this job posting for legitimacy:
 
-Job Details:
-- Job Title: {job_title}
-- Company: {company_name}
-- Job URL: {job_url}
+                Job Details:
+                - Job Title: {job_title}
+                - Company: {company_name}
+                - Job URL: {job_url}
 
-Technical Verification:
-- URL Validation: {validate_url}
-- Verified Job Board: {in_verified_job_board}
+                Technical Verification:
+                - URL Validation: {validate_url}
+                - Verified Job Board: {in_verified_job_board}
 
-Risk Indicators:
-- Red Flags Detected: {desc_analysis['red_flag_count']} ({red_flags_display})
-- Suspicious Patterns: {desc_analysis['suspicious_pattern_count']} (severity score: {desc_analysis['suspicious_pattern_severity']})
-- Calculated Risk Score: {desc_analysis['risk_score']}/90
-- Machine Learning Prediction: {'Legitimate' if ml_prediction == 1 else 'Suspicious'}
+                Risk Indicators:
+                - Red Flags Detected: {desc_analysis['red_flag_count']} ({red_flags_display})
+                - Suspicious Patterns: {desc_analysis['suspicious_pattern_count']} (severity score: {desc_analysis['suspicious_pattern_severity']})
+                - Calculated Risk Score: {desc_analysis['risk_score']}/90
+                - Machine Learning Prediction: {'Legitimate' if ml_prediction == 1 else 'Suspicious'}
 
-Comprehensive Analysis Request:
-1. Provide a detailed assessment of the job posting's legitimacy.
-2. Explain the reasoning behind your assessment, citing specific evidence.
-3. Generate a confidence percentage (0-100%) based on the strength of evidence.
-    - If the prediction is LEGITIMATE, the confidence should naturally tend towards a higher percentage (reflecting higher certainty)
-    - If the prediction is SUSPICIOUS, the confidence should naturally tend towards a lower percentage (reflecting lower certainty)
-4. Highlight specific red flags or positive indicators found.
-5. Recommend actions for the job seeker.
+                Comprehensive Analysis Request:
+                1. Provide a detailed assessment of the job posting's legitimacy.
+                2. Explain the reasoning behind your assessment, citing specific evidence.
+                3. Generate a confidence percentage (0-100%) based on the strength of evidence.
+                    - If the prediction is LEGITIMATE, the confidence should naturally tend towards a higher percentage (reflecting higher certainty)
+                    - If the prediction is SUSPICIOUS, the confidence should naturally tend towards a lower percentage (reflecting lower certainty)
+                                4. Highlight specific red flags or positive indicators found.
+                                5. Recommend actions for the job seeker.
 
-Output Format:
-Prediction: [Legitimate/Suspicious]
-Confidence: [XX%]
-Explanation: [Your detailed reasoning here]
+                                IMPORTANT: Return a single JSON object only (no extra commentary). The JSON must include these keys:
+                                    - "prediction": "Legitimate" or "Suspicious"
+                                    - "confidence": integer 0-100 (if obvious scam indicators present or Calculated Risk Score >=50, set to 0)
+                                    - "positive_indicators": list of short strings (or empty list)
+                                    - "negative_indicators": list of short strings (or empty list)
+                                    - "explanation": concise 1-3 sentence explanation
 
-Your response should be Accurate, Clear, Concise and straight to the point. 
-Your tone should be friendly but professional."""
+                                Example JSON:
+                                {"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":["pay_upfront","western_union"],"explanation":"Upfront payment requested and Western Union mentioned."}
+
+                                If you cannot follow these rules exactly, return {"prediction":"Suspicious","confidence":0,"positive_indicators":[],"negative_indicators":[],"explanation":"Unable to produce structured output."}
+                                Your tone should be professional and concise. Provide only the JSON object as the response."""
 
             # Generate analysis
             response = gemini_model.generate_content(prompt)
             response_text = response.text
             
-            # Extract prediction and confidence from the response with better fallback
-            prediction_match = re.search(r'Prediction:\s*(Legitimate|Suspicious)', response_text, re.IGNORECASE)
-            confidence_match = re.search(r'Confidence:\s*(\d+)\s*%', response_text, re.IGNORECASE)
+            # Try to parse a JSON object from the model response first (preferred)
+            confidence = None
+            prediction = "Unknown"
+            positive_indicators = []
+            negative_indicators = []
+            explanation = response_text
 
-            prediction = prediction_match.group(1).capitalize() if prediction_match else "Unknown"
-            
-            # Extract confidence with better fallback logic
-            if confidence_match:
-                confidence = int(confidence_match.group(1))
-                # Ensure confidence is within valid range
+            # Look for the first JSON object in the response
+            json_obj = None
+            m = re.search(r"(\{[\s\S]*\})", response_text)
+            if m:
+                try:
+                    json_obj = json.loads(m.group(1))
+                except Exception:
+                    json_obj = None
+
+            if json_obj:
+                # Safely extract fields
+                prediction = str(json_obj.get("prediction", "Unknown")).capitalize()
+                try:
+                    confidence = int(json_obj.get("confidence", 0))
+                except Exception:
+                    confidence = 0
+                positive_indicators = json_obj.get("positive_indicators", []) or []
+                negative_indicators = json_obj.get("negative_indicators", []) or []
+                explanation = json_obj.get("explanation", explanation)
+                # Enforce confidence bounds
                 confidence = max(0, min(100, confidence))
+                # Enforce critical rule: if Calculated Risk Score >=50 or obvious negatives present, force 0
+                obvious_negative_terms = ["pay_upfront","wire_transfer","western_union","money_gram","no_interview","no_experience","guaranteed_income","bank_details","upfront_fee","bitcoin","crypto","send_money"]
+                if desc_analysis.get('risk_score', 0) >= 50 or any(term in ",".join(negative_indicators).lower() for term in obvious_negative_terms):
+                    confidence = 0
+                    prediction = "Suspicious"
             else:
-                # Fallback: estimate confidence based on detected risks
-                risk_score = desc_analysis['risk_score']
-                confidence = 100 - risk_score if prediction.lower() == "suspicious" else 50 + (risk_score // 2)
+                # Fallback to regex extraction if JSON not provided
+                prediction_match = re.search(r'Prediction:\s*(Legitimate|Suspicious)', response_text, re.IGNORECASE)
+                confidence_match = re.search(r'Confidence:\s*(\d+)\s*%', response_text, re.IGNORECASE)
+                prediction = prediction_match.group(1).capitalize() if prediction_match else "Unknown"
+                if confidence_match:
+                    confidence = int(confidence_match.group(1))
+                    confidence = max(0, min(100, confidence))
+                else:
+                    # Fallback heuristic: derive confidence from risk_score
+                    risk_score = desc_analysis.get('risk_score', 0)
+                    if prediction.lower() == "suspicious":
+                        confidence = 0 if risk_score >= 50 else max(10, 50 - (risk_score // 2))
+                    elif prediction.lower() == "legitimate":
+                        # Only increase confidence when there are positive indicators
+                        pos = []
+                        if in_verified_job_board:
+                            pos.append('verified_job_board')
+                        if desc_analysis.get('red_flag_count', 0) == 0 and desc_analysis.get('suspicious_pattern_severity', 0) == 0:
+                            pos.append('no_flags')
+                        confidence = 60 + min(40, len(pos) * 20)
+                    else:
+                        confidence = 50
+
+            # Ensure final safety bounds
+            if confidence is None:
+                confidence = 0
+            confidence = int(max(0, min(100, confidence)))
 
             # Display results
             st.markdown('<div class="section-header"> ANALYSIS RESULTS</div>', unsafe_allow_html=True)
