@@ -1,60 +1,63 @@
 # Job Fraud Analyzer API
 
-A FastAPI-based REST API that helps evaluate whether a job posting is legitimate or suspicious. It combines a lightweight rule-based engine, machine learning prediction, and optional LLM aggregation to provide comprehensive job legitimacy analysis.
-
----
+A production-ready FastAPI REST API that evaluates job postings for legitimacy using heuristic analysis, machine learning, and optional LLM integration.
 
 ## Features
 
-- **Heuristic Analysis**: Red-flag detection for common scam indicators (upfront payments, vague descriptions, bank details requests, poor grammar)
-- **ML Prediction**: Pre-trained model for binary classification of job legitimacy
+- **Heuristic Analysis**: Red-flag detection (upfront payments, vague descriptions, suspicious phrases)
+- **ML Prediction**: Pre-trained model for binary job legitimacy classification
 - **URL Validation**: Domain validation with TLD checking
-- **LLM Integration**: Optional Google Gemini AI for natural language explanations
-- **RESTful API**: Clean FastAPI endpoints with Pydantic validation
-- **Production Ready**: Logging, error handling, health checks, and containerization support
+- **Optional LLM**: Google Gemini AI for enhanced analysis
+- **RESTful API**: Clean endpoints with Pydantic validation
+- **Production Ready**: Logging, error handling, health checks, Docker support
 
----
+## Quick Start
 
-## Architecture
+### Local Development
 
+```bash
+# Clone and setup
+git clone https://github.com/aify6/Job-fraud-analyzer.git
+cd Job-fraud-analyzer
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment (optional: for Gemini LLM)
+cp .env.example .env
+# Edit .env with your GEMINI_API_KEY
+
+# Run server
+uvicorn app.main:app --reload
 ```
-app/
-├── main.py              # FastAPI application entry point
-├── api/
-│   └── routes.py        # API endpoints
-├── services/
-│   └── prediction.py    # Business logic service
-├── models/
-│   └── model_loader.py  # ML model management
-├── schemas/
-│   └── request.py       # Pydantic models
-├── utils/
-│   └── preprocessing.py # Text preprocessing utilities
-└── core/
-    └── config.py        # Application configuration
 
-artifacts/
-├── model.pkl            # Trained ML model
-└── tfidf_vectorizer.pkl # Text vectorizer
+API available at: `http://localhost:8000`
+
+### Docker
+
+```bash
+docker-compose up --build
 ```
-
----
 
 ## API Endpoints
 
 ### POST `/api/v1/analyze`
-Analyze a job posting for legitimacy.
+Analyze a job posting.
 
-**Request Body:**
+**Request:**
 ```json
 {
-  "company_name": "Acme Corporation",
+  "company_name": "Acme Corp",
   "job_title": "Software Engineer",
-  "job_description": "Detailed job description...",
-  "job_url": "https://example.com/job123",
-  "company_profile": "Leading tech company",
-  "requirements": "Job requirements...",
-  "benefits": "Job benefits..."
+  "job_description": "Build secure applications...",
+  "job_url": "https://jobs.example.com/123",
+  "company_profile": "Tech leader",
+  "requirements": "5+ years experience",
+  "benefits": "Competitive salary, remote"
 }
 ```
 
@@ -63,97 +66,46 @@ Analyze a job posting for legitimacy.
 {
   "prediction": "Legitimate",
   "confidence": 85,
-  "explanation": "Detailed analysis...",
+  "explanation": "Analysis details...",
   "risk_score": 15,
-  "red_flags": ["guaranteed income"],
+  "red_flags": [],
   "verified_source": true,
   "url_valid": true
 }
 ```
 
 ### GET `/health`
-Health check endpoint.
+Health check.
 
 ### GET `/`
-API information.
+API info.
 
----
+### GET `/docs`
+Interactive Swagger UI (when server running).
 
-## Prerequisites
+## Architecture
 
-- Python 3.8+
-- pip package manager
-- (Optional) GEMINI_API_KEY for LLM features
-
----
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/aify6/Job-fraud-analyzer.git
-cd Job-fraud-analyzer
 ```
+app/
+├── main.py            # FastAPI application
+├── api/routes.py      # REST endpoints
+├── services/          # Business logic
+├── models/            # ML model management
+├── schemas/           # Request/response models
+├── utils/             # Text preprocessing
+└── core/config.py     # Configuration
 
-2. Create virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+artifacts/            # ML model files
 ```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Set environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your GEMINI_API_KEY
-```
-
----
-
-## Running Locally
-
-### Development
-```bash
-uvicorn app.main:app --reload
-```
-
-### Production
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-The API will be available at `http://localhost:8000`
-
-### With Docker
-```bash
-docker-compose up --build
-```
-
----
 
 ## Configuration
 
 Environment variables:
 
 - `GEMINI_API_KEY`: Google Gemini API key (optional)
-- `DEBUG`: Enable debug mode (default: false)
-- `MODEL_PATH`: Path to ML model (default: artifacts/model.pkl)
+- `DEBUG`: Debug mode (default: false)
+- `MODEL_PATH`: Path to model (default: artifacts/model.pkl)
 - `VECTORIZER_PATH`: Path to vectorizer (default: artifacts/tfidf_vectorizer.pkl)
-
----
-
-## Testing
-
-Run the test harness:
-```bash
-python test_improvements.py
-```
-
----
 
 ## Deployment
 
@@ -163,91 +115,21 @@ docker build -t job-fraud-analyzer .
 docker run -p 8000:8000 -e GEMINI_API_KEY=your_key job-fraud-analyzer
 ```
 
-### Docker Compose
-```bash
-docker-compose up -d
-```
+### Cloud (Railway, Render, etc.)
+1. Connect GitHub repo
+2. Set environment variables in platform dashboard
+3. Deploy
 
-### Cloud Platforms
-- **Railway**: Connect GitHub repo, set environment variables
-- **Render**: Use Dockerfile, set environment variables
-- **Heroku**: Use `uvicorn` command in Procfile
+## Notes
 
----
-
-## API Documentation
-
-When running locally, visit `http://localhost:8000/docs` for interactive Swagger UI documentation.
-
----
-
-## Security Notes
-
-- Never commit API keys to the repository
-- Use environment variables for sensitive configuration
-- The API includes CORS middleware (configure origins for production)
-- Input validation via Pydantic models
-- Comprehensive error handling and logging
-
----
-
-## Troubleshooting
-
-- **Model loading errors**: Ensure `artifacts/` directory contains model files
-- **API key errors**: Set `GEMINI_API_KEY` environment variable
-- **Port conflicts**: Change port with `--port` parameter
-- **Import errors**: Ensure all dependencies are installed
-
----
+- Model files required in `artifacts/` directory
+- API key is optional (local ML fallback works without it)
+- Comprehensive logging and error handling built-in
+- CORS configured for cross-origin requests
 
 ## License
 
-See LICENSE file for details.
-- (Optional) `GEMINI_API_KEY` to use Google Generative AI (Gemini) for natural-language aggregation.
-
----
-
-## Installation (local)
-
-1. Clone the repository:
-
-```powershell
-git clone https://github.com/aify6/Job-fraud-analyzer.git
-cd "Job-fraud-analyzer"
-```
-
-2. Create and activate a virtual environment:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-3. Install dependencies:
-
-```powershell
-pip install -r requirements.txt
-```
-
-4. (Optional) Create a `.env` file or set environment variables for local testing. See the next section for secrets.
-
----
-
-## Configuration & Secrets
-
-This app can optionally call a generative LLM (Gemini). To enable that, provide your API key via one of these methods:
-
-- Set an environment variable in PowerShell for the current session:
-
-```powershell
-$env:GEMINI_API_KEY = 'your_key_here'
-```
-
-- Or set it permanently for your user (Windows):
-
-```powershell
-setx GEMINI_API_KEY "your_key_here"
-```
+See LICENSE file.
 
 - When deploying to Streamlit Cloud, add `GEMINI_API_KEY` as a secret in your app settings (do not commit keys to the repo).
 
