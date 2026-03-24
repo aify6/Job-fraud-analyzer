@@ -7,7 +7,7 @@ A production-ready FastAPI REST API that evaluates job postings for legitimacy u
 - **Heuristic Analysis**: Red-flag detection (upfront payments, vague descriptions, suspicious phrases)
 - **ML Prediction**: Pre-trained model for binary job legitimacy classification
 - **URL Validation**: Domain validation with TLD checking
-- **Optional LLM**: Google Gemini AI for enhanced analysis
+- **LLM**: Google Gemini AI for enhanced analysis
 - **RESTful API**: Clean endpoints with Pydantic validation
 - **Production Ready**: Logging, error handling, health checks, Docker support
 
@@ -77,11 +77,6 @@ Analyze a job posting.
 ### GET `/health`
 Health check.
 
-### GET `/`
-API info.
-
-### GET `/docs`
-Interactive Swagger UI (when server running).
 
 ## Architecture
 
@@ -129,9 +124,9 @@ docker run -p 8000:8000 -e GEMINI_API_KEY=your_key job-fraud-analyzer
 
 ## License
 
-See LICENSE file.
+MIT LICENSE
 
-- When deploying to Streamlit Cloud, add `GEMINI_API_KEY` as a secret in your app settings (do not commit keys to the repo).
+- When deploying to Cloud, add `GEMINI_API_KEY` as a secret in your app settings (do not commit keys to the repo).
 
 The app also supports `python-dotenv` if you prefer a `.env` file locally; add `GEMINI_API_KEY=...` to your `.env` and the app will load it.
 
@@ -152,37 +147,13 @@ Open the local URL shown by Streamlit (usually `http://localhost:8501`). If `GEM
 ## How it works (short)
 
 1. Input fields in the UI collect `job_title`, `company_name`, `job_url`, and the job description.
-2. `joblegitchecker2.py` examines the description for known red flags and suspicious patterns and computes a `risk_score`.
+2. The AI examines the description for known red flags and suspicious patterns and computes a `risk_score`.
 3. An internal ML component (if model files are present) produces a simple `Legitimate`/`Suspicious` suggestion.
-4. Optionally, the app constructs a concise prompt and calls the configured LLM to aggregate findings into a short human-friendly explanation.
+4. The app constructs a concise prompt and calls the configured LLM to aggregate findings into a short human-friendly explanation with further recommendarions.
 5. Deterministic post-processing rules are applied: in cases of clear negative evidence (e.g., `risk_score >= 50` or explicit requests for payment), the app will force `Prediction: Suspicious` and `Confidence: 0%` regardless of LLM output.
 
 ---
 
-## Testing
-
-There is a small harness used during development:
-
-```powershell
-python test_improvements.py
-```
-
-This script runs several sample checks to validate `joblegitchecker2.py` scoring and URL validation.
-
----
-
-## Deployment (Streamlit Cloud)
-
-1. Push your repo to GitHub.
-2. On Streamlit Cloud, create a new app and connect your repository/branch.
-3. In the app settings, add `GEMINI_API_KEY` as a secret (if you want LLM-enabled behavior).
-4. Provide the start command if needed: `streamlit run app.py`.
-
-Notes:
-- Ensure `requirements.txt` lists all runtime packages. Streamlit Cloud will install from it.
-- Do not store secrets in the repo.
-
----
 
 ## Troubleshooting
 
